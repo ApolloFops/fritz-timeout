@@ -48,6 +48,30 @@ class Timeout(commands.Cog):
 
 		await ctx.send(str(database.get_timeout_roles(ctx.guild.id, timeout_id)))
 
+	@command_group.command(name="timeout_user", description="Time out a user.")
+	@commands.has_permissions(administrator=True)
+	async def timeout_user_command(self, ctx, timeout_id: str, user: discord.Member):
+		await self.timeout_user(ctx.guild.id, timeout_id, user)
+
+		await ctx.respond(f"Added timeout `{timeout_id}` to user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+
+	@command_group.command(name="untimeout_user", description="Remove a time out from a user.")
+	@commands.has_permissions(administrator=True)
+	async def untimeout_user_command(self, ctx, timeout_id: str, user: discord.Member):
+		await self.untimeout_user(ctx.guild.id, timeout_id, user)
+
+		await ctx.respond(f"Removed timeout `{timeout_id}` from user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+
+	async def timeout_user(self, guild_id: int, timeout_id: str, user: discord.Member):
+		roles = database.get_timeout_roles(guild_id, timeout_id)
+
+		await user.add_roles(*map(discord.Object, roles))
+
+	async def untimeout_user(self, guild_id: int, timeout_id: str, user: discord.Member):
+		roles = database.get_timeout_roles(guild_id, timeout_id)
+
+		await user.remove_roles(*map(discord.Object, roles))
+
 
 def setup(bot):
 	bot.add_cog(Timeout(bot))
