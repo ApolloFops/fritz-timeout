@@ -156,13 +156,13 @@ class TimeoutDatabase:
 				return set(map(int, data[0].split(",")))
 
 	# Active Timeouts
-	def add_timeout(self, user_id, role_id, end_date: datetime, timeout_by, reason):
+	def add_timeout(self, user_id: int, timeout_id: str, end_date: datetime, timeout_by, reason):
 		with self.connect_db() as db:
 			db.cursor().execute(
 				TimeoutQueries.add_timeout,
 				(
 					str(user_id),
-					str(role_id),
+					timeout_id,
 					end_date.strftime("%Y-%m-%d %H:%M:%S"),
 					str(timeout_by),
 					reason
@@ -180,10 +180,10 @@ class TimeoutDatabase:
 		if result is None:
 			return None
 
-		role_id, end_date, timeout_by, reason = result
+		timeout_id, end_date, timeout_by, reason = result
 
 		return (
-			role_id,
+			timeout_id,
 			datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S"),
 			timeout_by,
 			reason
