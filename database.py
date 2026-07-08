@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS timeouts (
 	end_date TEXT NOT NULL,
 	timeout_by TEXT NOT NULL,
 	reason TEXT,
-	PRIMARY KEY (user_id, role_id)
+	PRIMARY KEY (user_id, timeout_id)
 )
 """
 
