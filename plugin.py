@@ -104,11 +104,11 @@ class Timeout(commands.Cog):
 		await user.add_roles(*map(discord.Object, roles))
 
 	async def untimeout_user(self, guild_id: int, timeout_id: str, user: discord.Member):
-		database.remove_timeout(guild_id, user.id, timeout_id)
-
 		roles = database.get_timeout_roles(guild_id, timeout_id)
 
 		await user.remove_roles(*map(discord.Object, roles))
+
+		database.remove_timeout(guild_id, user.id, timeout_id)
 
 
 def setup(bot):
