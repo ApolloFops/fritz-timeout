@@ -49,46 +49,42 @@ WHERE
 	# Active Timeouts
 	create_timeouts_table = """
 CREATE TABLE IF NOT EXISTS timeouts (
+	guild_id TEXT NOT NULL,
 	user_id TEXT NOT NULL,
 	timeout_id TEXT NOT NULL,
-	end_date TEXT NOT NULL,
+	end_date TEXT,
 	timeout_by TEXT NOT NULL,
 	reason TEXT,
-	PRIMARY KEY (user_id, timeout_id)
+	PRIMARY KEY (guild_id, user_id, timeout_id)
 )
 """
 
 	add_timeout = """
 INSERT INTO timeouts (
+	guild_id,
 	user_id,
 	timeout_id,
 	end_date,
 	timeout_by,
 	reason
 )
-VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(user_id, timeout_id)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(guild_id, user_id, timeout_id)
 DO UPDATE SET
 	end_date = excluded.end_date,
 	timeout_by = excluded.timeout_by,
 	reason = excluded.reason;
 """
 
-	get_timeout = """
-SELECT timeout_id, end_date, timeout_by, reason
-FROM timeouts
-WHERE user_id = ?;
-"""
-
 	get_expired_timeouts = """
-SELECT user_id, timeout_id
+SELECT guild_id, user_id, timeout_id
 FROM timeouts
 WHERE end_date <= datetime('now');
 """
 
 	remove_timeout = """
 DELETE FROM timeouts
-WHERE user_id = ? AND timeout_id = ?;
+WHERE guild_id = ? AND user_id = ? AND timeout_id = ?;
 """
 
 
@@ -156,38 +152,20 @@ class TimeoutDatabase:
 				return set(map(int, data[0].split(",")))
 
 	# Active Timeouts
-	def add_timeout(self, user_id: int, timeout_id: str, end_date: datetime, timeout_by, reason):
+	def add_timeout(self, guild_id: int, user_id: int, timeout_id: str, end_date: datetime | None, timeout_by: int, reason: str | None):
 		with self.connect_db() as db:
 			db.cursor().execute(
 				TimeoutQueries.add_timeout,
 				(
+					str(guild_id),
 					str(user_id),
 					timeout_id,
-					end_date.strftime("%Y-%m-%d %H:%M:%S"),
+					end_date.strftime("%Y-%m-%d %H:%M:%S") if end_date is not None else None,
 					str(timeout_by),
 					reason
 				)
 			)
 			db.commit()
-
-	def get_timeout(self, user_id):
-		with self.connect_db() as db:
-			result = db.cursor().execute(
-				TimeoutQueries.get_timeout,
-				(str(user_id),)
-			).fetchone()
-
-		if result is None:
-			return None
-
-		timeout_id, end_date, timeout_by, reason = result
-
-		return (
-			timeout_id,
-			datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S"),
-			timeout_by,
-			reason
-		)
 
 	def get_expired_timeouts(self):
 		with self.connect_db() as db:
@@ -195,10 +173,10 @@ class TimeoutDatabase:
 				TimeoutQueries.get_expired_timeouts
 			).fetchall()
 
-	def remove_timeout(self, user_id, role_id):
+	def remove_timeout(self, guild_id: int, user_id: int, timeout_id: str):
 		with self.connect_db() as db:
 			db.cursor().execute(
 				TimeoutQueries.remove_timeout,
-				(str(user_id), str(role_id))
+				(str(guild_id), str(user_id), str(timeout_id))
 			)
 			db.commit()

@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta
+import re
+
 import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup
@@ -15,6 +18,27 @@ class Timeout(commands.Cog):
 
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
+
+	hm_regex = re.compile(r"((?P<years>\d+)y)?((?P<months>\d+)M)?((?P<weeks>\d+)w)?((?P<days>\d+)d)?((?P<hours>\d+)h)?((?P<minutes>\d+)m)?((?P<seconds>\d+)s)?")
+
+	def hm_to_date(self, hm_str: str):
+		"""Converts an hour-minute string to a time in the future.
+
+		This is mostly borrowed from Dozer."""
+
+		matches = re.match(self.hm_regex, hm_str).groupdict()
+		years = int(matches.get('years') or 0)
+		months = int(matches.get('months') or 0)
+		weeks = int(matches.get('weeks') or 0)
+		days = int(matches.get('days') or 0)
+		hours = int(matches.get('hours') or 0)
+		minutes = int(matches.get('minutes') or 0)
+		seconds = int(matches.get('seconds') or 0)
+		val = int((years * 3.154e+7) + (months * 2.628e+6) + (weeks * 604800) + (days * 86400) + (hours * 3600) + (minutes * 60) + seconds)
+		# Make sure it is a positive number, and it doesn't exceed the max 32-bit int
+		seconds = max(0, min(2147483647, val))
+
+		return datetime.now() + timedelta(seconds=seconds)
 
 	@command_group.command(name="create_timeout", description="Creates a timeout category that you can assign roles and channels to.")
 	@commands.has_permissions(administrator=True)
@@ -50,24 +74,28 @@ class Timeout(commands.Cog):
 
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)
-	async def timeout_user_command(self, ctx, timeout_id: str, user: discord.Member):
-		await self.timeout_user(ctx.guild.id, timeout_id, user)
+	async def timeout_user_command(self, ctx, timeout_id: str, user: discord.Member, end_in: discord.Option(str, required=False), reason: discord.Option(str, required=False)):
+		await self.timeout_user(ctx.guild.id, timeout_id, user, self.hm_to_date(end_in) if end_in is not None else None, ctx.author.id, reason or "")
 
 		await ctx.respond(f"Added timeout `{timeout_id}` to user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="untimeout_user", description="Remove a time out from a user.")
 	@commands.has_permissions(administrator=True)
-	async def untimeout_user_command(self, ctx, timeout_id: str, user: discord.Member):
+	async def untimeout_user_command(self, ctx, timeout_id: str, user: discord.Member, reason: discord.Option(str, required=False)):
 		await self.untimeout_user(ctx.guild.id, timeout_id, user)
 
 		await ctx.respond(f"Removed timeout `{timeout_id}` from user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
 
-	async def timeout_user(self, guild_id: int, timeout_id: str, user: discord.Member):
+	async def timeout_user(self, guild_id: int, timeout_id: str, user: discord.Member, end_date: datetime | None, timeout_by: int, reason: str):
+		database.add_timeout(guild_id, user.id, timeout_id, end_date, timeout_by, reason)
+
 		roles = database.get_timeout_roles(guild_id, timeout_id)
 
 		await user.add_roles(*map(discord.Object, roles))
 
 	async def untimeout_user(self, guild_id: int, timeout_id: str, user: discord.Member):
+		database.remove_timeout(guild_id, user.id, timeout_id)
+
 		roles = database.get_timeout_roles(guild_id, timeout_id)
 
 		await user.remove_roles(*map(discord.Object, roles))
