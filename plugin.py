@@ -19,6 +19,16 @@ class Timeout(commands.Cog):
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
 
+	@commands.Cog.listener()
+	async def on_ready(self):
+		for raw_timeout in database.get_expired_timeouts():
+			guild_id, user_id, timeout_id = raw_timeout
+
+			guild = await self.bot.get_or_fetch(discord.Guild, guild_id)
+			member = await guild.get_or_fetch(discord.Member, user_id)
+
+			await self.untimeout_user(guild_id, timeout_id, member)
+
 	hm_regex = re.compile(r"((?P<years>\d+)y)?((?P<months>\d+)M)?((?P<weeks>\d+)w)?((?P<days>\d+)d)?((?P<hours>\d+)h)?((?P<minutes>\d+)m)?((?P<seconds>\d+)s)?")
 
 	def hm_to_date(self, hm_str: str):
