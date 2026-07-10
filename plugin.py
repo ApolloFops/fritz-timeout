@@ -240,7 +240,7 @@ class Timeout(commands.Cog):
 		try:
 			date = self.hm_to_date(end_in) if end_in is not None else None
 
-			await self.timeout_user(ctx.guild.id, timeout_id, user, date, ctx.author.id, reason or "")
+			await self.timeout_user(ctx.guild.id, timeout_id, user, date, ctx.author.id, reason)
 
 			await ctx.respond(view=TimeoutUserView(timeout_id, user, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
 		except sqlite3.IntegrityError:
@@ -259,7 +259,7 @@ class Timeout(commands.Cog):
 			try:
 				date = self.hm_to_date(end_in) if end_in is not None else None
 
-				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, date, ctx.author.id, reason or "")
+				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, date, ctx.author.id, reason)
 
 				await ctx.respond(view=TimeoutUserView(timeout_id, ctx.author, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
 			except sqlite3.IntegrityError:
@@ -267,7 +267,7 @@ class Timeout(commands.Cog):
 		else:
 			await ctx.respond(f"Not able to self assign timeout `{timeout_id}`!")
 
-	async def timeout_user(self, guild_id: int, timeout_id: str, user: discord.Member, end_date: datetime | None, timeout_by: int, reason: str):
+	async def timeout_user(self, guild_id: int, timeout_id: str, user: discord.Member, end_date: datetime | None, timeout_by: int, reason: str | None):
 		database.add_timeout(guild_id, user.id, timeout_id, end_date, timeout_by, reason)
 
 		roles = database.get_timeout_roles(guild_id, timeout_id)
