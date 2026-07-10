@@ -127,6 +127,12 @@ FROM timeouts
 WHERE guild_id = ? AND timeout_id = ?;
 """
 
+	get_timeout_reason = """
+SELECT reason
+FROM timeouts
+WHERE guild_id = ? AND user_id = ? AND timeout_id = ?;
+"""
+
 	remove_timeout = """
 DELETE FROM timeouts
 WHERE guild_id = ? AND user_id = ? AND timeout_id = ?;
@@ -287,6 +293,18 @@ class TimeoutDatabase:
 				TimeoutQueries.check_for_timeouts,
 				(str(guild_id), timeout_id)
 			).fetchall()
+
+	def get_timeout_reason(self, guild_id: int, user_id: int, timeout_id: str):
+		with self.connect_db() as db:
+			data = db.cursor().execute(
+				TimeoutQueries.get_timeout_reason,
+				(str(guild_id), str(user_id), timeout_id)
+			).fetchone()
+
+			if (data is None) or (data[0] is None) or (data[0] == ''):
+				return None
+			else:
+				return str(data[0])
 
 	def remove_timeout(self, guild_id: int, user_id: int, timeout_id: str):
 		with self.connect_db() as db:

@@ -177,7 +177,7 @@ class TimeoutUserView(discord.ui.DesignerView):
 
 
 class UntimeoutUserView(discord.ui.DesignerView):
-	def __init__(self, timeout_id: str, user: discord.Member, reason: str | None):
+	def __init__(self, timeout_id: str, user: discord.Member, original_reason: str | None, reason: str | None):
 		super().__init__(timeout=None)
 
 		container = discord.ui.Container(colour=discord.Colour.green())
@@ -189,7 +189,13 @@ class UntimeoutUserView(discord.ui.DesignerView):
 		body_text = discord.ui.TextDisplay(f"Removed timeout from user {user.mention} with timeout `{timeout_id}`")
 		container.add_item(body_text)
 
-		reason_header = discord.ui.TextDisplay("### Reason")
+		original_reason_header = discord.ui.TextDisplay("### Original Reason")
+		container.add_item(original_reason_header)
+
+		original_reason_text = discord.ui.TextDisplay(original_reason if original_reason is not None else "No reason provided")
+		container.add_item(original_reason_text)
+
+		reason_header = discord.ui.TextDisplay("### Untimeout Reason")
 		container.add_item(reason_header)
 
 		reason_text = discord.ui.TextDisplay(reason if reason is not None else "No reason provided")
@@ -364,9 +370,11 @@ class Timeout(commands.Cog):
 	@command_group.command(name="untimeout_user", description="Remove a time out from a user.")
 	@commands.has_permissions(administrator=True)
 	async def untimeout_user_command(self, ctx, timeout_id: str, user: discord.Member, reason: discord.Option(str, required=False)):
+		original_reason = database.get_timeout_reason(ctx.guild.id, user.id, timeout_id)
+
 		await self.untimeout_user(ctx.guild.id, timeout_id, user)
 
-		await ctx.respond(view=UntimeoutUserView(timeout_id, user, reason), allowed_mentions=discord.AllowedMentions(users=False))
+		await ctx.respond(view=UntimeoutUserView(timeout_id, user, original_reason, reason), allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="selftimeout", description="Time out yourself.")
 	async def selftimeoutcommand(self, ctx, timeout_id: str, end_in: str, reason: discord.Option(str, required=False)):
