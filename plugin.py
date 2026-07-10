@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import re
-import sqlite3
 
 import discord
 from discord.ext import commands
