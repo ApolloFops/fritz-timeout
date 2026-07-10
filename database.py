@@ -33,6 +33,16 @@ WHERE
 	guild_id = ? AND timeout_id = ?;
 """
 
+	check_config_exists = """
+SELECT EXISTS(
+	SELECT 1
+	FROM timeout_configs
+	WHERE
+		guild_id = ? AND timeout_id = ?
+	LIMIT 1
+);
+"""
+
 	get_configs_for_guild = """
 SELECT timeout_id, timeout_description, role_ids, channel_ids
 FROM timeout_configs
@@ -175,6 +185,13 @@ class TimeoutDatabase:
 				raise NotApplicableError(f"Failed to delete config `{timeout_id}`: No timeout exists in guild `{guild_id}`.")
 
 			db.commit()
+
+	def check_timeout_config_exists(self, guild_id: int, timeout_id: str):
+		with self.connect_db() as db:
+			return db.cursor().execute(
+				TimeoutQueries.check_config_exists,
+				(str(guild_id), timeout_id)
+			).fetchone()[0]
 
 	def get_timeout_configs_for_guild(self, guild_id: int, allow_self_assign: bool):
 		with self.connect_db() as db:

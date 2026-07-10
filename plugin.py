@@ -305,6 +305,10 @@ class Timeout(commands.Cog):
 	@config_group.command(name="add_role", description="Adds a role to the given timeout category, which will be assigned when the timeout is active.")
 	@commands.has_permissions(administrator=True)
 	async def add_role(self, ctx, timeout_id: str, role: discord.Role):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
 		try:
 			database.add_timeout_role(ctx.guild.id, timeout_id, role.id)
 
@@ -321,6 +325,10 @@ class Timeout(commands.Cog):
 	@config_group.command(name="remove_role", description="Removes a role from the given timeout category.")
 	@commands.has_permissions(administrator=True)
 	async def remove_role(self, ctx, timeout_id: str, role: discord.Role):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
 		try:
 			database.remove_timeout_role(ctx.guild.id, timeout_id, role.id)
 
@@ -337,6 +345,10 @@ class Timeout(commands.Cog):
 	@config_group.command(name="allow_self_assign", description="Sets whether or not the user should be allowed to self-assign this timeout.")
 	@commands.has_permissions(administrator=True)
 	async def allow_self_assign(self, ctx, timeout_id: str, allow: bool):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
 		database.set_timeout_self_assignable(ctx.guild.id, timeout_id, allow)
 
 		await ctx.respond(view=TimeoutAllowSelfAssignView(timeout_id, allow))
@@ -358,6 +370,10 @@ class Timeout(commands.Cog):
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)
 	async def timeout_user_command(self, ctx, timeout_id: str, user: discord.Member, end_in: discord.Option(str, required=False), reason: discord.Option(str, required=False)):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
 		try:
 			date = self.hm_to_date(end_in) if end_in is not None else None
 
@@ -370,6 +386,10 @@ class Timeout(commands.Cog):
 	@command_group.command(name="untimeout_user", description="Remove a time out from a user.")
 	@commands.has_permissions(administrator=True)
 	async def untimeout_user_command(self, ctx, timeout_id: str, user: discord.Member, reason: discord.Option(str, required=False)):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
 		try:
 			original_reason = database.get_timeout_reason(ctx.guild.id, user.id, timeout_id)
 
@@ -381,6 +401,10 @@ class Timeout(commands.Cog):
 
 	@command_group.command(name="selftimeout", description="Time out yourself.")
 	async def selftimeoutcommand(self, ctx, timeout_id: str, end_in: str, reason: discord.Option(str, required=False)):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
 		if database.get_timeout_self_assignable(ctx.guild.id, timeout_id):
 			try:
 				date = self.hm_to_date(end_in) if end_in is not None else None
