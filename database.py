@@ -32,6 +32,13 @@ WHERE
 	guild_id = ? AND timeout_id = ?;
 """
 
+	get_configs_for_guild = """
+SELECT timeout_id, timeout_description, role_ids, channel_ids
+FROM timeout_configs
+WHERE
+	guild_id = ? AND allow_self_assign = ?;
+"""
+
 	set_timeout_description = """
 UPDATE timeout_configs
 SET timeout_description = ?
@@ -158,6 +165,13 @@ class TimeoutDatabase:
 				raise ValueError(f"Failed to delete config `{timeout_id}`: No timeout exists in guild `{guild_id}`.")
 
 			db.commit()
+
+	def get_timeout_configs_for_guild(self, guild_id: int, allow_self_assign: bool):
+		with self.connect_db() as db:
+			return db.cursor().execute(
+				TimeoutQueries.get_configs_for_guild,
+				(str(guild_id), int(allow_self_assign))
+			).fetchall()
 
 	def set_timeout_description(self, guild_id: int, timeout_id: str, description: str | None):
 		with self.connect_db() as db:

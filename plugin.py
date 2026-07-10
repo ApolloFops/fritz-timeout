@@ -76,6 +76,43 @@ class TimeoutAllowSelfAssignView(discord.ui.DesignerView):
 		container.add_item(body_text)
 
 
+class TimeoutConfigsView(discord.ui.DesignerView):
+	def __init__(self, config_list, self_assignable_config_list):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.blurple())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay("### Timeout configs")
+		container.add_item(title_text)
+
+		self.generate_config_list(container, config_list)
+
+		self_assignable_title_text = discord.ui.TextDisplay("### Self-assignable timeout configs")
+		container.add_item(self_assignable_title_text)
+
+		self.generate_config_list(container, self_assignable_config_list)
+
+	def generate_config_list(self, container, config_list):
+		if len(config_list):
+			for config in config_list:
+				timeout_id, timeout_description, role_ids, channel_ids = config
+
+				if (role_ids is None) or (role_ids == ''):
+					role_list = None
+				else:
+					role_list = set(map(int, role_ids.split(",")))
+
+				config_item_text = discord.ui.TextDisplay(f"""
+				- `{timeout_id}`{f" ({timeout_description})" if timeout_description is not None else ""}
+					Roles: {", ".join(f"<@&{x}>" for x in role_list)}
+				""")
+				container.add_item(config_item_text)
+		else:
+			no_timeouts_text = discord.ui.TextDisplay("No timeouts")
+			container.add_item(no_timeouts_text)
+
+
 class TimeoutActiveTimeoutsView(discord.ui.DesignerView):
 	def __init__(self, timeout_list):
 		super().__init__(timeout=None)
@@ -296,6 +333,13 @@ class Timeout(commands.Cog):
 		database.set_timeout_self_assignable(ctx.guild.id, timeout_id, allow)
 
 		await ctx.respond(view=TimeoutAllowSelfAssignView(timeout_id, allow))
+
+	@command_group.command(name="list_timeout_config", description="List the timeout config for this server.")
+	async def list_timeout_config(self, ctx):
+		config_list = database.get_timeout_configs_for_guild(ctx.guild.id, False)
+		self_assignable_config_list = database.get_timeout_configs_for_guild(ctx.guild.id, True)
+
+		await ctx.respond(view=TimeoutConfigsView(config_list, self_assignable_config_list), allowed_mentions=discord.AllowedMentions(roles=False))
 
 	@command_group.command(name="list_active_timeouts", description="List all the active timeouts in this server.")
 	@commands.has_permissions(administrator=True)
