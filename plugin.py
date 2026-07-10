@@ -12,6 +12,7 @@ from resources.shared import CONTEXTS, INTEGRATION_TYPES
 
 from .config import LOG_COMPONENT
 from .database import TimeoutDatabase
+from .shared import NotApplicableError
 
 database = TimeoutDatabase()
 
@@ -276,7 +277,7 @@ class Timeout(commands.Cog):
 			database.insert_timeout_config(ctx.guild.id, timeout_id)
 
 			await ctx.respond(view=TimeoutCreateDeleteView(timeout_id, True))
-		except sqlite3.IntegrityError:
+		except NotApplicableError:
 			await ctx.respond(f"Failed to create timeout: a timeout with name `{timeout_id}` already exists!")
 
 	@config_group.command(name="delete_timeout", description="Deletes a timeout category. THIS CAN NOT BE UNDONE!")
@@ -292,7 +293,7 @@ class Timeout(commands.Cog):
 			database.remove_timeout_config(ctx.guild.id, timeout_id)
 
 			await ctx.respond(view=TimeoutCreateDeleteView(timeout_id, False))
-		except ValueError:
+		except NotApplicableError:
 			await ctx.respond(f"Failed to delete timeout: no timeout exists with name `{timeout_id}`!")
 
 	@config_group.command(name="set_description", description="Sets a timeout's description.")
@@ -315,7 +316,7 @@ class Timeout(commands.Cog):
 				await member.add_roles(role)
 
 			await ctx.respond(view=TimeoutAddRemoveRoleView(role.mention, timeout_id, True), allowed_mentions=discord.AllowedMentions(roles=False))
-		except ValueError:
+		except NotApplicableError:
 			await ctx.respond(f"Failed to add role: role {role.mention} already in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
 	@config_group.command(name="remove_role", description="Removes a role from the given timeout category.")
@@ -364,7 +365,7 @@ class Timeout(commands.Cog):
 			await self.timeout_user(ctx.guild.id, timeout_id, user, date, ctx.author.id, reason)
 
 			await ctx.respond(view=TimeoutUserView(timeout_id, user, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
-		except sqlite3.IntegrityError:
+		except NotApplicableError:
 			await ctx.respond(f"User {user.mention} already has timeout `{timeout_id}`. Untimeout them first before attempting to timeout them.", allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="untimeout_user", description="Remove a time out from a user.")
@@ -376,7 +377,7 @@ class Timeout(commands.Cog):
 			await self.untimeout_user(ctx.guild.id, timeout_id, user)
 
 			await ctx.respond(view=UntimeoutUserView(timeout_id, user, original_reason, reason), allowed_mentions=discord.AllowedMentions(users=False))
-		except ValueError:
+		except NotApplicableError:
 			await ctx.respond(f"Failed to untimeout: timeout `{timeout_id}` not applied to user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="selftimeout", description="Time out yourself.")
@@ -388,7 +389,7 @@ class Timeout(commands.Cog):
 				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, date, ctx.author.id, reason)
 
 				await ctx.respond(view=TimeoutUserView(timeout_id, ctx.author, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
-			except sqlite3.IntegrityError:
+			except NotApplicableError:
 				await ctx.respond(f"You already has timeout `{timeout_id}`!")
 		else:
 			await ctx.respond(f"Not able to self assign timeout `{timeout_id}`!")

@@ -2,6 +2,7 @@ import sqlite3
 from datetime import datetime
 
 from .config import DATABASE_PATH
+from .shared import NotApplicableError
 
 
 class TimeoutQueries:
@@ -151,12 +152,15 @@ class TimeoutDatabase:
 
 	# Configuration
 	def insert_timeout_config(self, guild_id: int, timeout_id: str):
-		with self.connect_db() as db:
-			db.cursor().execute(
-				TimeoutQueries.insert_config,
-				(str(guild_id), timeout_id)
-			)
-			db.commit()
+		try:
+			with self.connect_db() as db:
+				db.cursor().execute(
+					TimeoutQueries.insert_config,
+					(str(guild_id), timeout_id)
+				)
+				db.commit()
+		except sqlite3.IntegrityError:
+			raise NotApplicableError(f"Failed to insert timeout config `{timeout_id}`: Timeout already exists in guild `{guild_id}`.")
 
 	def remove_timeout_config(self, guild_id: int, timeout_id: str):
 		with self.connect_db() as db:
@@ -168,7 +172,7 @@ class TimeoutDatabase:
 			)
 
 			if cursor.rowcount == 0:
-				raise ValueError(f"Failed to delete config `{timeout_id}`: No timeout exists in guild `{guild_id}`.")
+				raise NotApplicableError(f"Failed to delete config `{timeout_id}`: No timeout exists in guild `{guild_id}`.")
 
 			db.commit()
 
@@ -195,7 +199,7 @@ class TimeoutDatabase:
 		role_list = self.get_timeout_roles(guild_id, timeout_id)
 
 		if role_id in role_list:
-			raise ValueError(f"Role '{role_id}' already exists in timeout {timeout_id}.")
+			raise NotApplicableError(f"Role '{role_id}' already exists in timeout {timeout_id}.")
 
 		role_list.add(role_id)
 
@@ -254,19 +258,22 @@ class TimeoutDatabase:
 
 	# Active Timeouts
 	def add_timeout(self, guild_id: int, user_id: int, timeout_id: str, end_date: datetime | None, timeout_by: int, reason: str | None):
-		with self.connect_db() as db:
-			db.cursor().execute(
-				TimeoutQueries.add_timeout,
-				(
-					str(guild_id),
-					str(user_id),
-					timeout_id,
-					end_date.strftime("%Y-%m-%d %H:%M:%S") if end_date is not None else None,
-					str(timeout_by),
-					reason
+		try:
+			with self.connect_db() as db:
+				db.cursor().execute(
+					TimeoutQueries.add_timeout,
+					(
+						str(guild_id),
+						str(user_id),
+						timeout_id,
+						end_date.strftime("%Y-%m-%d %H:%M:%S") if end_date is not None else None,
+						str(timeout_by),
+						reason
+					)
 				)
-			)
-			db.commit()
+				db.commit()
+		except sqlite3.IntegrityError:
+			raise NotApplicableError(f"Failed to timeout user {user_id} in guild {guild_id} with timeout `{timeout_id}`: User already timeouted!")
 
 	def get_timeouts(self):
 		with self.connect_db() as db:
@@ -316,6 +323,6 @@ class TimeoutDatabase:
 			)
 
 			if cursor.rowcount == 0:
-				raise ValueError(f"Failed to untimeout user {user_id} in guild {guild_id} with timeout `{timeout_id}`: Not timeouted!")
+				raise NotApplicableError(f"Failed to untimeout user {user_id} in guild {guild_id} with timeout `{timeout_id}`: Not timeouted!")
 
 			db.commit()
