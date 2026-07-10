@@ -123,6 +123,10 @@ class TimeoutDatabase:
 
 	def add_timeout_role(self, guild_id: int, timeout_id: str, role_id: int):
 		role_list = self.get_timeout_roles(guild_id, timeout_id)
+
+		if role_id in role_list:
+			raise ValueError(f"Role '{role_id}' already exists in timeout {timeout_id}.")
+
 		role_list.add(role_id)
 
 		self.set_timeout_roles(guild_id, timeout_id, role_list)

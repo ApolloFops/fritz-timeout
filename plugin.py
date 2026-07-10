@@ -99,28 +99,34 @@ class Timeout(commands.Cog):
 	@command_group.command(name="add_role", description="Adds a role to the given timeout category, which will be assigned when the timeout is active.")
 	@commands.has_permissions(administrator=True)
 	async def add_role(self, ctx, timeout_id: str, role: discord.Role):
-		database.add_timeout_role(ctx.guild.id, timeout_id, role.id)
+		try:
+			database.add_timeout_role(ctx.guild.id, timeout_id, role.id)
 
-		# Update existing timeouts
-		for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
-			member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
+			# Update existing timeouts
+			for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
+				member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
 
-			await member.add_roles(role)
+				await member.add_roles(role)
 
-		await ctx.respond(f"Added role {role.mention} to timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+			await ctx.respond(f"Added role {role.mention} to timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+		except ValueError:
+			await ctx.respond(f"Failed to add role: role {role.mention} already in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
 	@command_group.command(name="remove_role", description="Removes a role from the given timeout category.")
 	@commands.has_permissions(administrator=True)
 	async def remove_role(self, ctx, timeout_id: str, role: discord.Role):
-		database.remove_timeout_role(ctx.guild.id, timeout_id, role.id)
+		try:
+			database.remove_timeout_role(ctx.guild.id, timeout_id, role.id)
 
-		# Update existing timeouts
-		for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
-			member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
+			# Update existing timeouts
+			for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
+				member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
 
-			await member.remove_roles(role)
+				await member.remove_roles(role)
 
-		await ctx.respond(f"Removed role {role.mention} from timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+			await ctx.respond(f"Removed role {role.mention} from timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+		except KeyError:
+			await ctx.respond(f"Failed to remove role: role {role.mention} not in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)
