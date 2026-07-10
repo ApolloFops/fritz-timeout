@@ -92,6 +92,12 @@ class Timeout(commands.Cog):
 	@command_group.command(name="delete_timeout", description="Deletes a timeout category. THIS CAN NOT BE UNDONE!")
 	@commands.has_permissions(administrator=True)
 	async def delete_timeout(self, ctx, timeout_id: str):
+		# Remove existing timeouts
+		for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
+			member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
+
+			await self.untimeout_user(ctx.guild.id, timeout_id, member)
+
 		database.remove_timeout_config(ctx.guild.id, timeout_id)
 
 		await ctx.respond(f"Removed timeout `{timeout_id}`")
