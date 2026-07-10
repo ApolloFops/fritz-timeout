@@ -58,6 +58,44 @@ class TimeoutAllowSelfAssignView(discord.ui.DesignerView):
 		container.add_item(body_text)
 
 
+class TimeoutActiveTimeoutsView(discord.ui.DesignerView):
+	def __init__(self, timeout_list):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.blurple())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay("### Active timeouts")
+		container.add_item(title_text)
+
+		if len(timeout_list):
+			for timeout in timeout_list:
+				user_id, timeout_id, end_date, timeout_by, reason = timeout
+
+				timeout_line_text = f"- <@{user_id}> has timeout `{timeout_id}`"
+
+				if end_date is not None:
+					end_datetime = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+					date_string = discord.utils.format_dt(end_datetime, style='R')
+
+					timeout_line_text += f", ending in {date_string}."
+				else:
+					timeout_line_text += "."
+
+				timeout_line_text += f" Timeout is by <@{timeout_by}>"
+
+				if reason is not None:
+					timeout_line_text += f" for reason `{reason}`."
+				else:
+					timeout_line_text += "."
+
+				timeout_line_text_display = discord.ui.TextDisplay(timeout_line_text)
+				container.add_item(timeout_line_text_display)
+		else:
+			no_timeouts_text = discord.ui.TextDisplay("No active timeouts")
+			container.add_item(no_timeouts_text)
+
+
 class TimeoutUserView(discord.ui.DesignerView):
 	def __init__(self, timeout_id: str, user: discord.Member, end_date: datetime | None, reason: str | None):
 		super().__init__(timeout=None)
@@ -233,6 +271,13 @@ class Timeout(commands.Cog):
 		database.set_timeout_self_assignable(ctx.guild.id, timeout_id, allow)
 
 		await ctx.respond(view=TimeoutAllowSelfAssignView(timeout_id, allow))
+
+	@command_group.command(name="list_active_timeouts", description="List all the active timeouts in this server.")
+	@commands.has_permissions(administrator=True)
+	async def list_active_timeouts(self, ctx):
+		timeout_list = database.get_timeouts_for_guild(ctx.guild.id)
+
+		await ctx.respond(view=TimeoutActiveTimeoutsView(timeout_list), allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)

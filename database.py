@@ -93,6 +93,12 @@ SELECT guild_id, user_id, timeout_id, end_date
 FROM timeouts;
 """
 
+	get_timeouts_for_guild = """
+SELECT user_id, timeout_id, end_date, timeout_by, reason
+FROM timeouts
+WHERE guild_id = ?;
+"""
+
 	get_expired_timeouts = """
 SELECT guild_id, user_id, timeout_id
 FROM timeouts
@@ -225,6 +231,13 @@ class TimeoutDatabase:
 		with self.connect_db() as db:
 			return db.cursor().execute(
 				TimeoutQueries.get_timeouts
+			).fetchall()
+
+	def get_timeouts_for_guild(self, guild_id: int):
+		with self.connect_db() as db:
+			return db.cursor().execute(
+				TimeoutQueries.get_timeouts_for_guild,
+				(str(guild_id),)
 			).fetchall()
 
 	def get_expired_timeouts(self):
