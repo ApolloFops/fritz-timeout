@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS timeout_configs (
 	timeout_id TEXT NOT NULL,
 	role_ids TEXT,
 	channel_ids TEXT,
+	allow_self_assign BOOLEAN NOT NULL CHECK (allow_self_assign IN (0, 1)) DEFAULT 0,
 	PRIMARY KEY (guild_id, timeout_id)
 )
 """
@@ -40,6 +41,22 @@ WHERE
 
 	get_timeout_roles = """
 SELECT role_ids
+FROM timeout_configs
+WHERE
+	guild_id = ?
+	AND timeout_id = ?;
+"""
+
+	set_timeout_self_assignable = """
+UPDATE timeout_configs
+SET allow_self_assign = ?
+WHERE
+	guild_id = ?
+	AND timeout_id = ?;
+"""
+
+	get_timeout_self_assignable = """
+SELECT allow_self_assign
 FROM timeout_configs
 WHERE
 	guild_id = ?
@@ -166,6 +183,27 @@ class TimeoutDatabase:
 				return set()
 			else:
 				return set(map(int, data[0].split(",")))
+
+	def set_timeout_self_assignable(self, guild_id: int, timeout_id: str, self_assignable: bool):
+		with self.connect_db() as db:
+			db.cursor().execute(
+				TimeoutQueries.set_timeout_self_assignable,
+				(
+					int(self_assignable),
+					str(guild_id),
+					timeout_id,
+				)
+			)
+			db.commit()
+
+	def get_timeout_self_assignable(self, guild_id: int, timeout_id: str):
+		with self.connect_db() as db:
+			data = db.cursor().execute(
+				TimeoutQueries.get_timeout_self_assignable,
+				(str(guild_id), timeout_id)
+			).fetchone()
+
+			return bool(data[0])
 
 	# Active Timeouts
 	def add_timeout(self, guild_id: int, user_id: int, timeout_id: str, end_date: datetime | None, timeout_by: int, reason: str | None):

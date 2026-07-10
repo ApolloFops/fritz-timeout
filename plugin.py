@@ -140,6 +140,16 @@ class Timeout(commands.Cog):
 		except KeyError:
 			await ctx.respond(f"Failed to remove role: role {role.mention} not in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
+	@command_group.command(name="allow_self_assign", description="Sets whether or not the user should be allowed to self-assign this timeout.")
+	@commands.has_permissions(administrator=True)
+	async def allow_self_assign(self, ctx, timeout_id: str, allow: bool):
+		database.set_timeout_self_assignable(ctx.guild.id, timeout_id, allow)
+
+		if allow:
+			await ctx.respond(f"Allowed self-assign of timeout `{timeout_id}`")
+		else:
+			await ctx.respond(f"Disallowed self-assign of timeout `{timeout_id}`")
+
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)
 	async def timeout_user_command(self, ctx, timeout_id: str, user: discord.Member, end_in: discord.Option(str, required=False), reason: discord.Option(str, required=False)):
@@ -156,6 +166,18 @@ class Timeout(commands.Cog):
 		await self.untimeout_user(ctx.guild.id, timeout_id, user)
 
 		await ctx.respond(f"Removed timeout `{timeout_id}` from user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+
+	@command_group.command(name="selftimeout", description="Time out yourself.")
+	async def selftimeoutcommand(self, ctx, timeout_id: str, end_in: str, reason: discord.Option(str, required=False)):
+		if database.get_timeout_self_assignable(ctx.guild.id, timeout_id):
+			try:
+				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, self.hm_to_date(end_in) if end_in is not None else None, ctx.author.id, reason or "")
+
+				await ctx.respond(f"Added timeout `{timeout_id}` to user {ctx.author.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+			except sqlite3.IntegrityError:
+				await ctx.respond(f"You already has timeout `{timeout_id}`!")
+		else:
+			await ctx.respond(f"Not able to self assign timeout `{timeout_id}`!")
 
 	async def timeout_user(self, guild_id: int, timeout_id: str, user: discord.Member, end_date: datetime | None, timeout_by: int, reason: str):
 		database.add_timeout(guild_id, user.id, timeout_id, end_date, timeout_by, reason)
