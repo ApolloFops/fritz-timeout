@@ -68,12 +68,7 @@ INSERT INTO timeouts (
 	timeout_by,
 	reason
 )
-VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT(guild_id, user_id, timeout_id)
-DO UPDATE SET
-	end_date = excluded.end_date,
-	timeout_by = excluded.timeout_by,
-	reason = excluded.reason;
+VALUES (?, ?, ?, ?, ?, ?);
 """
 
 	get_timeouts = """

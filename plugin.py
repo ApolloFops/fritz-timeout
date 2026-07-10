@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import re
+import sqlite3
 
 import discord
 from discord.ext import commands
@@ -116,9 +117,12 @@ class Timeout(commands.Cog):
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)
 	async def timeout_user_command(self, ctx, timeout_id: str, user: discord.Member, end_in: discord.Option(str, required=False), reason: discord.Option(str, required=False)):
-		await self.timeout_user(ctx.guild.id, timeout_id, user, self.hm_to_date(end_in) if end_in is not None else None, ctx.author.id, reason or "")
+		try:
+			await self.timeout_user(ctx.guild.id, timeout_id, user, self.hm_to_date(end_in) if end_in is not None else None, ctx.author.id, reason or "")
 
-		await ctx.respond(f"Added timeout `{timeout_id}` to user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+			await ctx.respond(f"Added timeout `{timeout_id}` to user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+		except sqlite3.IntegrityError:
+			await ctx.respond(f"User {user.mention} already has timeout `{timeout_id}`. Untimeout them first before attempting to timeout them.", allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="untimeout_user", description="Remove a time out from a user.")
 	@commands.has_permissions(administrator=True)
