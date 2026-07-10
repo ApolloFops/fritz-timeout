@@ -85,22 +85,28 @@ class Timeout(commands.Cog):
 	@command_group.command(name="create_timeout", description="Creates a timeout category that you can assign roles and channels to.")
 	@commands.has_permissions(administrator=True)
 	async def create_timeout(self, ctx, timeout_id: str):
-		database.insert_timeout_config(ctx.guild.id, timeout_id)
+		try:
+			database.insert_timeout_config(ctx.guild.id, timeout_id)
 
-		await ctx.respond(f"Created timeout `{timeout_id}`")
+			await ctx.respond(f"Created timeout `{timeout_id}`")
+		except sqlite3.IntegrityError:
+			await ctx.respond(f"Failed to create timeout: a timeout with name `{timeout_id}` already exists!")
 
 	@command_group.command(name="delete_timeout", description="Deletes a timeout category. THIS CAN NOT BE UNDONE!")
 	@commands.has_permissions(administrator=True)
 	async def delete_timeout(self, ctx, timeout_id: str):
-		# Remove existing timeouts
-		for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
-			member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
+		try:
+			# Remove existing timeouts
+			for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
+				member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
 
-			await self.untimeout_user(ctx.guild.id, timeout_id, member)
+				await self.untimeout_user(ctx.guild.id, timeout_id, member)
 
-		database.remove_timeout_config(ctx.guild.id, timeout_id)
+			database.remove_timeout_config(ctx.guild.id, timeout_id)
 
-		await ctx.respond(f"Removed timeout `{timeout_id}`")
+			await ctx.respond(f"Removed timeout `{timeout_id}`")
+		except ValueError:
+			await ctx.respond(f"Failed to delete timeout: no timeout exists with name `{timeout_id}`!")
 
 	@command_group.command(name="add_role", description="Adds a role to the given timeout category, which will be assigned when the timeout is active.")
 	@commands.has_permissions(administrator=True)

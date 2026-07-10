@@ -115,10 +115,16 @@ class TimeoutDatabase:
 
 	def remove_timeout_config(self, guild_id: int, timeout_id: str):
 		with self.connect_db() as db:
-			db.cursor().execute(
+			cursor = db.cursor()
+
+			cursor.execute(
 				TimeoutQueries.remove_config,
 				(str(guild_id), timeout_id)
 			)
+
+			if cursor.rowcount == 0:
+				raise ValueError(f"Failed to delete config `{timeout_id}`: No timeout exists in guild `{guild_id}`.")
+
 			db.commit()
 
 	def add_timeout_role(self, guild_id: int, timeout_id: str, role_id: int):
