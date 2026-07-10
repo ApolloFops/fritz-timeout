@@ -99,7 +99,7 @@ class TimeoutConfigsView(discord.ui.DesignerView):
 				timeout_id, timeout_description, role_ids, channel_ids = config
 
 				if (role_ids is None) or (role_ids == ''):
-					role_list = None
+					role_list = set()
 				else:
 					role_list = set(map(int, role_ids.split(",")))
 
