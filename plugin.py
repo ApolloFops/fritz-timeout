@@ -109,8 +109,6 @@ class Timeout(commands.Cog):
 
 		await ctx.respond(f"Added role {role.mention} to timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
-		await ctx.send(str(database.get_timeout_roles(ctx.guild.id, timeout_id)))
-
 	@command_group.command(name="remove_role", description="Removes a role from the given timeout category.")
 	@commands.has_permissions(administrator=True)
 	async def remove_role(self, ctx, timeout_id: str, role: discord.Role):
@@ -123,8 +121,6 @@ class Timeout(commands.Cog):
 			await member.remove_roles(role)
 
 		await ctx.respond(f"Removed role {role.mention} from timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
-
-		await ctx.send(str(database.get_timeout_roles(ctx.guild.id, timeout_id)))
 
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)
