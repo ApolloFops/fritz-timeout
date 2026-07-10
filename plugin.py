@@ -16,6 +16,93 @@ from .database import TimeoutDatabase
 database = TimeoutDatabase()
 
 
+class TimeoutCreateDeleteView(discord.ui.DesignerView):
+	def __init__(self, timeout_id: str, created: bool):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.green() if created else discord.Colour.red())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay(f"### {'Created' if created else 'Deleted'} timeout")
+		container.add_item(title_text)
+
+		body_text = discord.ui.TextDisplay(f"{'Created' if created else 'Deleted'} timeout `{timeout_id}`")
+		container.add_item(body_text)
+
+
+class TimeoutAddRemoveRoleView(discord.ui.DesignerView):
+	def __init__(self, role_mention: str, timeout_id: str, added: bool):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.green() if added else discord.Colour.red())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay(f"### {'Added' if added else 'Removed'} timeout role")
+		container.add_item(title_text)
+
+		body_text = discord.ui.TextDisplay(f"{'Added' if added else 'Removed'} role {role_mention} {'to' if added else 'from'} `{timeout_id}`")
+		container.add_item(body_text)
+
+
+class TimeoutAllowSelfAssignView(discord.ui.DesignerView):
+	def __init__(self, timeout_id: str, allowed: bool):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.green() if allowed else discord.Colour.red())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay(f"### {'Allowed' if allowed else 'Disallowed'} self assign of timeout")
+		container.add_item(title_text)
+
+		body_text = discord.ui.TextDisplay(f"{'Allowed' if allowed else 'Disallowed'} self assign of timeout `{timeout_id}`")
+		container.add_item(body_text)
+
+
+class TimeoutUserView(discord.ui.DesignerView):
+	def __init__(self, timeout_id: str, user: discord.Member, end_date: datetime | None, reason: str | None):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.red())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay("### Timed out user")
+		container.add_item(title_text)
+
+		body_text = discord.ui.TextDisplay(f"Timed out user {user.mention} with timeout `{timeout_id}`")
+		container.add_item(body_text)
+
+		if end_date is not None:
+			date_string = discord.utils.format_dt(end_date, style='R')
+			date_text = discord.ui.TextDisplay(f"Ends in {date_string}")
+			container.add_item(date_text)
+
+		reason_header = discord.ui.TextDisplay("### Reason")
+		container.add_item(reason_header)
+
+		reason_text = discord.ui.TextDisplay(reason if reason is not None else "No reason provided")
+		container.add_item(reason_text)
+
+
+class UntimeoutUserView(discord.ui.DesignerView):
+	def __init__(self, timeout_id: str, user: discord.Member, reason: str | None):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.green())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay("### Removed timeout from user")
+		container.add_item(title_text)
+
+		body_text = discord.ui.TextDisplay(f"Removed timeout from user {user.mention} with timeout `{timeout_id}`")
+		container.add_item(body_text)
+
+		reason_header = discord.ui.TextDisplay("### Reason")
+		container.add_item(reason_header)
+
+		reason_text = discord.ui.TextDisplay(reason if reason is not None else "No reason provided")
+		container.add_item(reason_text)
+
+
 class Timeout(commands.Cog):
 	command_group = SlashCommandGroup("timeout", "Timeout functions", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
 
@@ -88,7 +175,7 @@ class Timeout(commands.Cog):
 		try:
 			database.insert_timeout_config(ctx.guild.id, timeout_id)
 
-			await ctx.respond(f"Created timeout `{timeout_id}`")
+			await ctx.respond(view=TimeoutCreateDeleteView(timeout_id, True))
 		except sqlite3.IntegrityError:
 			await ctx.respond(f"Failed to create timeout: a timeout with name `{timeout_id}` already exists!")
 
@@ -104,7 +191,7 @@ class Timeout(commands.Cog):
 
 			database.remove_timeout_config(ctx.guild.id, timeout_id)
 
-			await ctx.respond(f"Removed timeout `{timeout_id}`")
+			await ctx.respond(view=TimeoutCreateDeleteView(timeout_id, False))
 		except ValueError:
 			await ctx.respond(f"Failed to delete timeout: no timeout exists with name `{timeout_id}`!")
 
@@ -120,7 +207,7 @@ class Timeout(commands.Cog):
 
 				await member.add_roles(role)
 
-			await ctx.respond(f"Added role {role.mention} to timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+			await ctx.respond(view=TimeoutAddRemoveRoleView(role.mention, timeout_id, True), allowed_mentions=discord.AllowedMentions(roles=False))
 		except ValueError:
 			await ctx.respond(f"Failed to add role: role {role.mention} already in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
@@ -136,7 +223,7 @@ class Timeout(commands.Cog):
 
 				await member.remove_roles(role)
 
-			await ctx.respond(f"Removed role {role.mention} from timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+			await ctx.respond(view=TimeoutAddRemoveRoleView(role.mention, timeout_id, False), allowed_mentions=discord.AllowedMentions(roles=False))
 		except KeyError:
 			await ctx.respond(f"Failed to remove role: role {role.mention} not in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
@@ -145,18 +232,17 @@ class Timeout(commands.Cog):
 	async def allow_self_assign(self, ctx, timeout_id: str, allow: bool):
 		database.set_timeout_self_assignable(ctx.guild.id, timeout_id, allow)
 
-		if allow:
-			await ctx.respond(f"Allowed self-assign of timeout `{timeout_id}`")
-		else:
-			await ctx.respond(f"Disallowed self-assign of timeout `{timeout_id}`")
+		await ctx.respond(view=TimeoutAllowSelfAssignView(timeout_id, allow))
 
 	@command_group.command(name="timeout_user", description="Time out a user.")
 	@commands.has_permissions(administrator=True)
 	async def timeout_user_command(self, ctx, timeout_id: str, user: discord.Member, end_in: discord.Option(str, required=False), reason: discord.Option(str, required=False)):
 		try:
-			await self.timeout_user(ctx.guild.id, timeout_id, user, self.hm_to_date(end_in) if end_in is not None else None, ctx.author.id, reason or "")
+			date = self.hm_to_date(end_in) if end_in is not None else None
 
-			await ctx.respond(f"Added timeout `{timeout_id}` to user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+			await self.timeout_user(ctx.guild.id, timeout_id, user, date, ctx.author.id, reason or "")
+
+			await ctx.respond(view=TimeoutUserView(timeout_id, user, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
 		except sqlite3.IntegrityError:
 			await ctx.respond(f"User {user.mention} already has timeout `{timeout_id}`. Untimeout them first before attempting to timeout them.", allowed_mentions=discord.AllowedMentions(users=False))
 
@@ -165,15 +251,17 @@ class Timeout(commands.Cog):
 	async def untimeout_user_command(self, ctx, timeout_id: str, user: discord.Member, reason: discord.Option(str, required=False)):
 		await self.untimeout_user(ctx.guild.id, timeout_id, user)
 
-		await ctx.respond(f"Removed timeout `{timeout_id}` from user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+		await ctx.respond(view=UntimeoutUserView(timeout_id, user, reason), allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="selftimeout", description="Time out yourself.")
 	async def selftimeoutcommand(self, ctx, timeout_id: str, end_in: str, reason: discord.Option(str, required=False)):
 		if database.get_timeout_self_assignable(ctx.guild.id, timeout_id):
 			try:
-				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, self.hm_to_date(end_in) if end_in is not None else None, ctx.author.id, reason or "")
+				date = self.hm_to_date(end_in) if end_in is not None else None
 
-				await ctx.respond(f"Added timeout `{timeout_id}` to user {ctx.author.mention}", allowed_mentions=discord.AllowedMentions(users=False))
+				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, date, ctx.author.id, reason or "")
+
+				await ctx.respond(view=TimeoutUserView(timeout_id, ctx.author, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
 			except sqlite3.IntegrityError:
 				await ctx.respond(f"You already has timeout `{timeout_id}`!")
 		else:
