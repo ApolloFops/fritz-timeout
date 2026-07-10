@@ -370,11 +370,14 @@ class Timeout(commands.Cog):
 	@command_group.command(name="untimeout_user", description="Remove a time out from a user.")
 	@commands.has_permissions(administrator=True)
 	async def untimeout_user_command(self, ctx, timeout_id: str, user: discord.Member, reason: discord.Option(str, required=False)):
-		original_reason = database.get_timeout_reason(ctx.guild.id, user.id, timeout_id)
+		try:
+			original_reason = database.get_timeout_reason(ctx.guild.id, user.id, timeout_id)
 
-		await self.untimeout_user(ctx.guild.id, timeout_id, user)
+			await self.untimeout_user(ctx.guild.id, timeout_id, user)
 
-		await ctx.respond(view=UntimeoutUserView(timeout_id, user, original_reason, reason), allowed_mentions=discord.AllowedMentions(users=False))
+			await ctx.respond(view=UntimeoutUserView(timeout_id, user, original_reason, reason), allowed_mentions=discord.AllowedMentions(users=False))
+		except ValueError:
+			await ctx.respond(f"Failed to untimeout: timeout `{timeout_id}` not applied to user {user.mention}", allowed_mentions=discord.AllowedMentions(users=False))
 
 	@command_group.command(name="selftimeout", description="Time out yourself.")
 	async def selftimeoutcommand(self, ctx, timeout_id: str, end_in: str, reason: discord.Option(str, required=False)):

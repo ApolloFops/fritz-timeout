@@ -308,8 +308,14 @@ class TimeoutDatabase:
 
 	def remove_timeout(self, guild_id: int, user_id: int, timeout_id: str):
 		with self.connect_db() as db:
-			db.cursor().execute(
+			cursor = db.cursor()
+
+			cursor.execute(
 				TimeoutQueries.remove_timeout,
 				(str(guild_id), str(user_id), str(timeout_id))
 			)
+
+			if cursor.rowcount == 0:
+				raise ValueError(f"Failed to untimeout user {user_id} in guild {guild_id} with timeout `{timeout_id}`: Not timeouted!")
+
 			db.commit()
