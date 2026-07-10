@@ -5,6 +5,8 @@ import discord
 from discord.ext import commands
 from discord.commands import SlashCommandGroup
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
 from resources.shared import CONTEXTS, INTEGRATION_TYPES
 
 from .config import LOG_COMPONENT
@@ -19,8 +21,11 @@ class Timeout(commands.Cog):
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
 
+		self.scheduler = AsyncIOScheduler()
+
 	@commands.Cog.listener()
 	async def on_ready(self):
+		# Clear out all the expired timeouts
 		for raw_timeout in database.get_expired_timeouts():
 			guild_id, user_id, timeout_id = raw_timeout
 
@@ -28,6 +33,32 @@ class Timeout(commands.Cog):
 			member = await guild.get_or_fetch(discord.Member, user_id)
 
 			await self.untimeout_user(guild_id, timeout_id, member)
+
+		# Schedule all the active timeouts
+		active_timeouts = database.get_timeouts()
+
+		for guild_id, user_id, timeout_id, end_date in active_timeouts:
+			if end_date is not None:
+				exec_time = datetime.strptime(end_date, "%Y-%m-%d %H:%M:%S")
+
+				guild = await self.bot.get_or_fetch(discord.Guild, guild_id)
+				member = await guild.get_or_fetch(discord.Member, user_id)
+
+				self.schedule_untimeout(guild_id, timeout_id, member, exec_time)
+
+		self.scheduler.start()
+
+	def schedule_untimeout(self, guild_id: int, timeout_id: str, member: discord.Member, end_date: datetime):
+		job_id = f"{guild_id}-{member.id}-{timeout_id}"
+
+		if not self.scheduler.get_job(job_id):
+			self.scheduler.add_job(
+				self.untimeout_user,
+				"date",
+				run_date=end_date,
+				args=[guild_id, timeout_id, member],
+				id=job_id,
+			)
 
 	hm_regex = re.compile(r"((?P<years>\d+)y)?((?P<months>\d+)M)?((?P<weeks>\d+)w)?((?P<days>\d+)d)?((?P<hours>\d+)h)?((?P<minutes>\d+)m)?((?P<seconds>\d+)s)?")
 
@@ -103,10 +134,18 @@ class Timeout(commands.Cog):
 
 		await user.add_roles(*map(discord.Object, roles))
 
+		if end_date is not None:
+			self.schedule_untimeout(guild_id, timeout_id, user, end_date)
+
 	async def untimeout_user(self, guild_id: int, timeout_id: str, user: discord.Member):
 		roles = database.get_timeout_roles(guild_id, timeout_id)
 
 		await user.remove_roles(*map(discord.Object, roles))
+
+		job_id = f"{guild_id}-{user.id}-{timeout_id}"
+
+		if self.scheduler.get_job(job_id):
+			self.scheduler.remove_job(job_id)
 
 		database.remove_timeout(guild_id, user.id, timeout_id)
 

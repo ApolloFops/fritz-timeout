@@ -76,6 +76,11 @@ DO UPDATE SET
 	reason = excluded.reason;
 """
 
+	get_timeouts = """
+SELECT guild_id, user_id, timeout_id, end_date
+FROM timeouts;
+"""
+
 	get_expired_timeouts = """
 SELECT guild_id, user_id, timeout_id
 FROM timeouts
@@ -166,6 +171,12 @@ class TimeoutDatabase:
 				)
 			)
 			db.commit()
+
+	def get_timeouts(self):
+		with self.connect_db() as db:
+			return db.cursor().execute(
+				TimeoutQueries.get_timeouts
+			).fetchall()
 
 	def get_expired_timeouts(self):
 		with self.connect_db() as db:
