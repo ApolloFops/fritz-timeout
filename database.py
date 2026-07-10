@@ -82,6 +82,12 @@ FROM timeouts
 WHERE end_date <= datetime('now');
 """
 
+	check_for_timeouts = """
+SELECT user_id
+FROM timeouts
+WHERE guild_id = ? AND timeout_id = ?;
+"""
+
 	remove_timeout = """
 DELETE FROM timeouts
 WHERE guild_id = ? AND user_id = ? AND timeout_id = ?;
@@ -177,6 +183,13 @@ class TimeoutDatabase:
 		with self.connect_db() as db:
 			return db.cursor().execute(
 				TimeoutQueries.get_expired_timeouts
+			).fetchall()
+
+	def check_for_timeouts(self, guild_id: int, timeout_id: str):
+		with self.connect_db() as db:
+			return db.cursor().execute(
+				TimeoutQueries.check_for_timeouts,
+				(str(guild_id), timeout_id)
 			).fetchall()
 
 	def remove_timeout(self, guild_id: int, user_id: int, timeout_id: str):
