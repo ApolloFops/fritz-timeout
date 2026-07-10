@@ -30,6 +30,24 @@ class TimeoutCreateDeleteView(discord.ui.DesignerView):
 		container.add_item(body_text)
 
 
+class TimeoutSetDescriptionView(discord.ui.DesignerView):
+	def __init__(self, timeout_id: str, description: str | None):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.blurple())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay(f"### {'Set' if description is not None else 'Unset'} timeout description")
+		container.add_item(title_text)
+
+		if description is not None:
+			body_text = discord.ui.TextDisplay(f"Set description of timeout `{timeout_id}` to `{description}`.")
+			container.add_item(body_text)
+		else:
+			body_text = discord.ui.TextDisplay(f"Unset description of timeout `{timeout_id}`.")
+			container.add_item(body_text)
+
+
 class TimeoutAddRemoveRoleView(discord.ui.DesignerView):
 	def __init__(self, role_mention: str, timeout_id: str, added: bool):
 		super().__init__(timeout=None)
@@ -232,6 +250,13 @@ class Timeout(commands.Cog):
 			await ctx.respond(view=TimeoutCreateDeleteView(timeout_id, False))
 		except ValueError:
 			await ctx.respond(f"Failed to delete timeout: no timeout exists with name `{timeout_id}`!")
+
+	@command_group.command(name="set_timeout_description", description="Sets a timeout's description.")
+	@commands.has_permissions(administrator=True)
+	async def set_timeout_description(self, ctx, timeout_id: str, timeout_description: discord.Option(str, required=False)):
+		database.set_timeout_description(ctx.guild.id, timeout_id, timeout_description)
+
+		await ctx.respond(view=TimeoutSetDescriptionView(timeout_id, timeout_description))
 
 	@command_group.command(name="add_role", description="Adds a role to the given timeout category, which will be assigned when the timeout is active.")
 	@commands.has_permissions(administrator=True)

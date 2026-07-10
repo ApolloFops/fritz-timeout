@@ -10,6 +10,7 @@ class TimeoutQueries:
 CREATE TABLE IF NOT EXISTS timeout_configs (
 	guild_id TEXT NOT NULL,
 	timeout_id TEXT NOT NULL,
+	timeout_description TEXT,
 	role_ids TEXT,
 	channel_ids TEXT,
 	allow_self_assign BOOLEAN NOT NULL CHECK (allow_self_assign IN (0, 1)) DEFAULT 0,
@@ -29,6 +30,14 @@ VALUES (?, ?)
 DELETE FROM timeout_configs
 WHERE
 	guild_id = ? AND timeout_id = ?;
+"""
+
+	set_timeout_description = """
+UPDATE timeout_configs
+SET timeout_description = ?
+WHERE
+	guild_id = ?
+	AND timeout_id = ?;
 """
 
 	set_timeout_roles = """
@@ -148,6 +157,18 @@ class TimeoutDatabase:
 			if cursor.rowcount == 0:
 				raise ValueError(f"Failed to delete config `{timeout_id}`: No timeout exists in guild `{guild_id}`.")
 
+			db.commit()
+
+	def set_timeout_description(self, guild_id: int, timeout_id: str, description: str | None):
+		with self.connect_db() as db:
+			db.cursor().execute(
+				TimeoutQueries.set_timeout_description,
+				(
+					description,
+					str(guild_id),
+					timeout_id,
+				)
+			)
 			db.commit()
 
 	def add_timeout_role(self, guild_id: int, timeout_id: str, role_id: int):
