@@ -187,7 +187,7 @@ class UntimeoutUserView(discord.ui.DesignerView):
 		title_text = discord.ui.TextDisplay("### Removed timeout from user")
 		container.add_item(title_text)
 
-		body_text = discord.ui.TextDisplay(f"Removed timeout from user {user.mention} with timeout `{timeout_id}`")
+		body_text = discord.ui.TextDisplay(f"Removed timeout `{timeout_id}` from user {user.mention}")
 		container.add_item(body_text)
 
 		original_reason_header = discord.ui.TextDisplay("### Original Reason")
