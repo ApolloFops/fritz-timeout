@@ -89,9 +89,9 @@ class Timeout(commands.Cog):
 
 		await ctx.respond(f"Created timeout `{timeout_id}`")
 
-	@command_group.command(name="remove_timeout", description="Removes a timeout category.")
+	@command_group.command(name="delete_timeout", description="Deletes a timeout category. THIS CAN NOT BE UNDONE!")
 	@commands.has_permissions(administrator=True)
-	async def remove_timeout(self, ctx, timeout_id: str):
+	async def delete_timeout(self, ctx, timeout_id: str):
 		database.remove_timeout_config(ctx.guild.id, timeout_id)
 
 		await ctx.respond(f"Removed timeout `{timeout_id}`")
