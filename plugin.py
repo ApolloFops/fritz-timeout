@@ -375,6 +375,8 @@ class Timeout(commands.Cog):
 			return
 
 		try:
+			await ctx.defer()
+
 			date = self.hm_to_date(end_in) if end_in is not None else None
 
 			await self.timeout_user(ctx.guild.id, timeout_id, user, date, ctx.author.id, reason)
@@ -391,6 +393,8 @@ class Timeout(commands.Cog):
 			return
 
 		try:
+			await ctx.defer()
+
 			original_reason = database.get_timeout_reason(ctx.guild.id, user.id, timeout_id)
 
 			await self.untimeout_user(ctx.guild.id, timeout_id, user)
@@ -407,6 +411,8 @@ class Timeout(commands.Cog):
 
 		if database.get_timeout_self_assignable(ctx.guild.id, timeout_id):
 			try:
+				await ctx.defer()
+
 				date = self.hm_to_date(end_in) if end_in is not None else None
 
 				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, date, ctx.author.id, reason)
