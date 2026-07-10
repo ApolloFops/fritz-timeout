@@ -198,6 +198,7 @@ class UntimeoutUserView(discord.ui.DesignerView):
 
 class Timeout(commands.Cog):
 	command_group = SlashCommandGroup("timeout", "Timeout functions", contexts=CONTEXTS, integration_types=INTEGRATION_TYPES)
+	config_group = command_group.create_subgroup("config", "Timeout configuration functions")
 
 	def __init__(self, bot: discord.Bot):
 		self.bot = bot
@@ -262,7 +263,7 @@ class Timeout(commands.Cog):
 
 		return datetime.now() + timedelta(seconds=seconds)
 
-	@command_group.command(name="create_timeout", description="Creates a timeout category that you can assign roles and channels to.")
+	@config_group.command(name="create_timeout", description="Creates a timeout category that you can assign roles and channels to.")
 	@commands.has_permissions(administrator=True)
 	async def create_timeout(self, ctx, timeout_id: str):
 		try:
@@ -272,7 +273,7 @@ class Timeout(commands.Cog):
 		except sqlite3.IntegrityError:
 			await ctx.respond(f"Failed to create timeout: a timeout with name `{timeout_id}` already exists!")
 
-	@command_group.command(name="delete_timeout", description="Deletes a timeout category. THIS CAN NOT BE UNDONE!")
+	@config_group.command(name="delete_timeout", description="Deletes a timeout category. THIS CAN NOT BE UNDONE!")
 	@commands.has_permissions(administrator=True)
 	async def delete_timeout(self, ctx, timeout_id: str):
 		try:
@@ -288,14 +289,14 @@ class Timeout(commands.Cog):
 		except ValueError:
 			await ctx.respond(f"Failed to delete timeout: no timeout exists with name `{timeout_id}`!")
 
-	@command_group.command(name="set_timeout_description", description="Sets a timeout's description.")
+	@config_group.command(name="set_description", description="Sets a timeout's description.")
 	@commands.has_permissions(administrator=True)
-	async def set_timeout_description(self, ctx, timeout_id: str, timeout_description: discord.Option(str, required=False)):
+	async def set_description(self, ctx, timeout_id: str, timeout_description: discord.Option(str, required=False)):
 		database.set_timeout_description(ctx.guild.id, timeout_id, timeout_description)
 
 		await ctx.respond(view=TimeoutSetDescriptionView(timeout_id, timeout_description))
 
-	@command_group.command(name="add_role", description="Adds a role to the given timeout category, which will be assigned when the timeout is active.")
+	@config_group.command(name="add_role", description="Adds a role to the given timeout category, which will be assigned when the timeout is active.")
 	@commands.has_permissions(administrator=True)
 	async def add_role(self, ctx, timeout_id: str, role: discord.Role):
 		try:
@@ -311,7 +312,7 @@ class Timeout(commands.Cog):
 		except ValueError:
 			await ctx.respond(f"Failed to add role: role {role.mention} already in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
-	@command_group.command(name="remove_role", description="Removes a role from the given timeout category.")
+	@config_group.command(name="remove_role", description="Removes a role from the given timeout category.")
 	@commands.has_permissions(administrator=True)
 	async def remove_role(self, ctx, timeout_id: str, role: discord.Role):
 		try:
@@ -327,15 +328,15 @@ class Timeout(commands.Cog):
 		except KeyError:
 			await ctx.respond(f"Failed to remove role: role {role.mention} not in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
-	@command_group.command(name="allow_self_assign", description="Sets whether or not the user should be allowed to self-assign this timeout.")
+	@config_group.command(name="allow_self_assign", description="Sets whether or not the user should be allowed to self-assign this timeout.")
 	@commands.has_permissions(administrator=True)
 	async def allow_self_assign(self, ctx, timeout_id: str, allow: bool):
 		database.set_timeout_self_assignable(ctx.guild.id, timeout_id, allow)
 
 		await ctx.respond(view=TimeoutAllowSelfAssignView(timeout_id, allow))
 
-	@command_group.command(name="list_timeout_config", description="List the timeout config for this server.")
-	async def list_timeout_config(self, ctx):
+	@config_group.command(name="list", description="List the timeout config for this server.")
+	async def list_config(self, ctx):
 		config_list = database.get_timeout_configs_for_guild(ctx.guild.id, False)
 		self_assignable_config_list = database.get_timeout_configs_for_guild(ctx.guild.id, True)
 
