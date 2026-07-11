@@ -74,6 +74,22 @@ WHERE
 	AND timeout_id = ?;
 """
 
+	set_timeout_channels = """
+UPDATE timeout_configs
+SET channel_ids = ?
+WHERE
+	guild_id = ?
+	AND timeout_id = ?;
+"""
+
+	get_timeout_channels = """
+SELECT channel_ids
+FROM timeout_configs
+WHERE
+	guild_id = ?
+	AND timeout_id = ?;
+"""
+
 	set_timeout_self_assignable = """
 UPDATE timeout_configs
 SET allow_self_assign = ?
@@ -244,6 +260,46 @@ class TimeoutDatabase:
 		with self.connect_db() as db:
 			data = db.cursor().execute(
 				TimeoutQueries.get_timeout_roles,
+				(str(guild_id), timeout_id)
+			).fetchone()
+
+			if (data is None) or (data[0] is None) or (data[0] == ''):
+				return set()
+			else:
+				return set(map(int, data[0].split(",")))
+
+	def add_timeout_channel(self, guild_id: int, timeout_id: str, channel_id: int):
+		channel_list = self.get_timeout_channels(guild_id, timeout_id)
+
+		if channel_id in channel_list:
+			raise NotApplicableError(f"Channel '{channel_id}' already exists in timeout {timeout_id}.")
+
+		channel_list.add(channel_id)
+
+		self.set_timeout_channels(guild_id, timeout_id, channel_list)
+
+	def remove_timeout_channel(self, guild_id: int, timeout_id: str, channel_id: int):
+		channel_list = self.get_timeout_channels(guild_id, timeout_id)
+		channel_list.remove(channel_id)
+
+		self.set_timeout_channels(guild_id, timeout_id, channel_list)
+
+	def set_timeout_channels(self, guild_id: int, timeout_id: str, channel_ids: set):
+		with self.connect_db() as db:
+			db.cursor().execute(
+				TimeoutQueries.set_timeout_channels,
+				(
+					",".join(map(str, channel_ids)),
+					str(guild_id),
+					timeout_id,
+				)
+			)
+			db.commit()
+
+	def get_timeout_channels(self, guild_id: int, timeout_id: str):
+		with self.connect_db() as db:
+			data = db.cursor().execute(
+				TimeoutQueries.get_timeout_channels,
 				(str(guild_id), timeout_id)
 			).fetchone()
 

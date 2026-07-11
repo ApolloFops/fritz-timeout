@@ -62,6 +62,20 @@ class TimeoutAddRemoveRoleView(discord.ui.DesignerView):
 		container.add_item(body_text)
 
 
+class TimeoutAddRemoveChannelView(discord.ui.DesignerView):
+	def __init__(self, channel_link: str, timeout_id: str, added: bool):
+		super().__init__(timeout=None)
+
+		container = discord.ui.Container(colour=discord.Colour.green() if added else discord.Colour.red())
+		super().add_item(container)
+
+		title_text = discord.ui.TextDisplay(f"### {'Added' if added else 'Removed'} timeout channel")
+		container.add_item(title_text)
+
+		body_text = discord.ui.TextDisplay(f"{'Added' if added else 'Removed'} channel {channel_link} {'to' if added else 'from'} `{timeout_id}`")
+		container.add_item(body_text)
+
+
 class TimeoutAllowSelfAssignView(discord.ui.DesignerView):
 	def __init__(self, timeout_id: str, allowed: bool):
 		super().__init__(timeout=None)
@@ -77,7 +91,7 @@ class TimeoutAllowSelfAssignView(discord.ui.DesignerView):
 
 
 class TimeoutConfigsView(discord.ui.DesignerView):
-	def __init__(self, config_list, self_assignable_config_list):
+	def __init__(self, config_list, self_assignable_config_list, guild_id: int):
 		super().__init__(timeout=None)
 
 		container = discord.ui.Container(colour=discord.Colour.blurple())
@@ -86,14 +100,14 @@ class TimeoutConfigsView(discord.ui.DesignerView):
 		title_text = discord.ui.TextDisplay("### Timeout configs")
 		container.add_item(title_text)
 
-		self.generate_config_list(container, config_list)
+		self.generate_config_list(container, config_list, guild_id)
 
 		self_assignable_title_text = discord.ui.TextDisplay("### Self-assignable timeout configs")
 		container.add_item(self_assignable_title_text)
 
-		self.generate_config_list(container, self_assignable_config_list)
+		self.generate_config_list(container, self_assignable_config_list, guild_id)
 
-	def generate_config_list(self, container, config_list):
+	def generate_config_list(self, container, config_list, guild_id: int):
 		if len(config_list):
 			for config in config_list:
 				timeout_id, timeout_description, role_ids, channel_ids = config
@@ -103,9 +117,15 @@ class TimeoutConfigsView(discord.ui.DesignerView):
 				else:
 					role_list = set(map(int, role_ids.split(",")))
 
+				if (channel_ids is None) or (channel_ids == ''):
+					channel_list = set()
+				else:
+					channel_list = set(map(int, channel_ids.split(",")))
+
 				config_item_text = discord.ui.TextDisplay(f"""
 				- `{timeout_id}`{f" ({timeout_description})" if timeout_description is not None else ""}
 					Roles: {", ".join(f"<@&{x}>" for x in role_list)}
+					Channels: {", ".join(f"https://discord.com/channels/{guild_id}/{x}" for x in channel_list)}
 				""")
 				container.add_item(config_item_text)
 		else:
@@ -232,19 +252,19 @@ class Timeout(commands.Cog):
 				guild = await self.bot.get_or_fetch(discord.Guild, guild_id)
 				member = await guild.get_or_fetch(discord.Member, user_id)
 
-				self.schedule_untimeout(guild_id, timeout_id, member, exec_time)
+				self.schedule_untimeout(guild, timeout_id, member, exec_time)
 
 		self.scheduler.start()
 
-	def schedule_untimeout(self, guild_id: int, timeout_id: str, member: discord.Member, end_date: datetime):
-		job_id = f"{guild_id}-{member.id}-{timeout_id}"
+	def schedule_untimeout(self, guild: discord.Guild, timeout_id: str, member: discord.Member, end_date: datetime):
+		job_id = f"{guild}-{member.id}-{timeout_id}"
 
 		if not self.scheduler.get_job(job_id):
 			self.scheduler.add_job(
 				self.untimeout_user,
 				"date",
 				run_date=end_date,
-				args=[guild_id, timeout_id, member],
+				args=[guild, timeout_id, member],
 				id=job_id,
 			)
 
@@ -342,6 +362,44 @@ class Timeout(commands.Cog):
 		except KeyError:
 			await ctx.respond(f"Failed to remove role: role {role.mention} not in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
 
+	@config_group.command(name="add_channel", description="Adds a channel to the timeout category, which will not be accessible while the timeout is active.")
+	@commands.has_permissions(administrator=True)
+	async def add_channel(self, ctx, timeout_id: str, channel: discord.abc.GuildChannel):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
+		try:
+			database.add_timeout_channel(ctx.guild.id, timeout_id, channel.id)
+
+			# Update existing timeouts
+			for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
+				member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
+				await channel.set_permissions(member, view_channel=False)
+
+			await ctx.respond(view=TimeoutAddRemoveChannelView(channel.jump_url, timeout_id, True), allowed_mentions=discord.AllowedMentions(roles=False))
+		except NotApplicableError:
+			await ctx.respond(f"Failed to add channel: channel {channel.jump_url} already in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+
+	@config_group.command(name="remove_channel", description="Removes a channel from the given timeout category.")
+	@commands.has_permissions(administrator=True)
+	async def remove_channel(self, ctx, timeout_id: str, channel: discord.abc.GuildChannel):
+		if not database.check_timeout_config_exists(ctx.guild.id, timeout_id):
+			await ctx.respond(f"Timeout `{timeout_id}` does not exist!")
+			return
+
+		try:
+			database.remove_timeout_channel(ctx.guild.id, timeout_id, channel.id)
+
+			# Update existing timeouts
+			for user_id in database.check_for_timeouts(ctx.guild.id, timeout_id):
+				member = await ctx.guild.get_or_fetch(discord.Member, user_id[0])
+				await channel.set_permissions(member, overwrite=None)
+
+			await ctx.respond(view=TimeoutAddRemoveChannelView(channel.jump_url, timeout_id, False), allowed_mentions=discord.AllowedMentions(roles=False))
+		except KeyError:
+			await ctx.respond(f"Failed to remove channel: channel {channel.jump_url} not in timeout `{timeout_id}`", allowed_mentions=discord.AllowedMentions(roles=False))
+
 	@config_group.command(name="allow_self_assign", description="Sets whether or not the user should be allowed to self-assign this timeout.")
 	@commands.has_permissions(administrator=True)
 	async def allow_self_assign(self, ctx, timeout_id: str, allow: bool):
@@ -358,7 +416,7 @@ class Timeout(commands.Cog):
 		config_list = database.get_timeout_configs_for_guild(ctx.guild.id, False)
 		self_assignable_config_list = database.get_timeout_configs_for_guild(ctx.guild.id, True)
 
-		await ctx.respond(view=TimeoutConfigsView(config_list, self_assignable_config_list), allowed_mentions=discord.AllowedMentions(roles=False))
+		await ctx.respond(view=TimeoutConfigsView(config_list, self_assignable_config_list, ctx.guild.id), allowed_mentions=discord.AllowedMentions(roles=False))
 
 	@command_group.command(name="list_active_timeouts", description="List all the active timeouts in this server.")
 	@commands.has_permissions(administrator=True)
@@ -379,7 +437,7 @@ class Timeout(commands.Cog):
 
 			date = self.hm_to_date(end_in) if end_in is not None else None
 
-			await self.timeout_user(ctx.guild.id, timeout_id, user, date, ctx.author.id, reason)
+			await self.timeout_user(ctx.guild, timeout_id, user, date, ctx.author.id, reason)
 
 			await ctx.respond(view=TimeoutUserView(timeout_id, user, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
 		except NotApplicableError:
@@ -397,7 +455,7 @@ class Timeout(commands.Cog):
 
 			original_reason = database.get_timeout_reason(ctx.guild.id, user.id, timeout_id)
 
-			await self.untimeout_user(ctx.guild.id, timeout_id, user)
+			await self.untimeout_user(ctx.guild, timeout_id, user)
 
 			await ctx.respond(view=UntimeoutUserView(timeout_id, user, original_reason, reason), allowed_mentions=discord.AllowedMentions(users=False))
 		except NotApplicableError:
@@ -415,7 +473,7 @@ class Timeout(commands.Cog):
 
 				date = self.hm_to_date(end_in) if end_in is not None else None
 
-				await self.timeout_user(ctx.guild.id, timeout_id, ctx.author, date, ctx.author.id, reason)
+				await self.timeout_user(ctx.guild, timeout_id, ctx.author, date, ctx.author.id, reason)
 
 				await ctx.respond(view=TimeoutUserView(timeout_id, ctx.author, date, reason), allowed_mentions=discord.AllowedMentions(users=False))
 			except NotApplicableError:
@@ -423,27 +481,38 @@ class Timeout(commands.Cog):
 		else:
 			await ctx.respond(f"Not able to self assign timeout `{timeout_id}`!")
 
-	async def timeout_user(self, guild_id: int, timeout_id: str, user: discord.Member, end_date: datetime | None, timeout_by: int, reason: str | None):
-		database.add_timeout(guild_id, user.id, timeout_id, end_date, timeout_by, reason)
+	async def timeout_user(self, guild: discord.Guild, timeout_id: str, user: discord.Member, end_date: datetime | None, timeout_by: int, reason: str | None):
+		database.add_timeout(guild.id, user.id, timeout_id, end_date, timeout_by, reason)
 
-		roles = database.get_timeout_roles(guild_id, timeout_id)
-
+		roles = database.get_timeout_roles(guild.id, timeout_id)
 		await user.add_roles(*map(discord.Object, roles))
 
-		if end_date is not None:
-			self.schedule_untimeout(guild_id, timeout_id, user, end_date)
+		channels = database.get_timeout_channels(guild.id, timeout_id)
 
-	async def untimeout_user(self, guild_id: int, timeout_id: str, user: discord.Member):
-		roles = database.get_timeout_roles(guild_id, timeout_id)
+		for channel_id in channels:
+			channel = await guild.get_or_fetch(discord.abc.GuildChannel, channel_id)
+			await channel.set_permissions(user, view_channel=False)
+
+		if end_date is not None:
+			self.schedule_untimeout(guild, timeout_id, user, end_date)
+
+	async def untimeout_user(self, guild: discord.Guild, timeout_id: str, user: discord.Member):
+		roles = database.get_timeout_roles(guild.id, timeout_id)
 
 		await user.remove_roles(*map(discord.Object, roles))
 
-		job_id = f"{guild_id}-{user.id}-{timeout_id}"
+		channels = database.get_timeout_channels(guild.id, timeout_id)
+
+		for channel_id in channels:
+			channel = await guild.get_or_fetch(discord.abc.GuildChannel, channel_id)
+			await channel.set_permissions(user, overwrite=None)
+
+		job_id = f"{guild.id}-{user.id}-{timeout_id}"
 
 		if self.scheduler.get_job(job_id):
 			self.scheduler.remove_job(job_id)
 
-		database.remove_timeout(guild_id, user.id, timeout_id)
+		database.remove_timeout(guild.id, user.id, timeout_id)
 
 
 def setup(bot):
