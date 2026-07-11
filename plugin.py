@@ -7,11 +7,12 @@ from discord.commands import SlashCommandGroup
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from resources.shared import CONTEXTS, INTEGRATION_TYPES
-
 from .config import LOG_COMPONENT
 from .database import TimeoutDatabase
 from .shared import NotApplicableError
+
+CONTEXTS = {discord.InteractionContextType.guild, discord.InteractionContextType.private_channel}
+INTEGRATION_TYPES = {discord.IntegrationType.guild_install}
 
 database = TimeoutDatabase()
 
